@@ -2467,45 +2467,45 @@ var Todo = class extends CustomType {
   }
 };
 var Model2 = class extends CustomType {
-  constructor(todos, current_todo_content, next_id, local_user) {
+  constructor(todos, current_todo_content, next_todo_id, local_user) {
     super();
     this.todos = todos;
     this.current_todo_content = current_todo_content;
-    this.next_id = next_id;
+    this.next_todo_id = next_todo_id;
     this.local_user = local_user;
   }
 };
-var AddTodo = class extends CustomType {
+var UserAddedTodo = class extends CustomType {
 };
-var RemoveTodo = class extends CustomType {
-  constructor(x0) {
+var UserRemovedTodo = class extends CustomType {
+  constructor(id2) {
     super();
-    this[0] = x0;
+    this.id = id2;
   }
 };
-var ToggleDone = class extends CustomType {
-  constructor(x0) {
+var UserToggledTodo = class extends CustomType {
+  constructor(id2) {
     super();
-    this[0] = x0;
+    this.id = id2;
   }
 };
-var CurrentTodoUpdate = class extends CustomType {
-  constructor(x0) {
+var UserUpdatedCurrentTodoContent = class extends CustomType {
+  constructor(new_content) {
     super();
-    this[0] = x0;
+    this.new_content = new_content;
   }
 };
 function init2(_) {
   return new Model2(toList([]), "", 1, "anonymous");
 }
 function update(model, msg) {
-  if (msg instanceof AddTodo) {
+  if (msg instanceof UserAddedTodo) {
     let $ = model.current_todo_content === "";
     if ($) {
       return model;
     } else {
       let todo_ = new Todo(
-        model.next_id,
+        model.next_todo_id,
         false,
         model.local_user,
         model.current_todo_content
@@ -2515,29 +2515,29 @@ function update(model, msg) {
           let _pipe = model.todos;
           return append(_pipe, toList([todo_]));
         })(),
-        next_id: model.next_id + 1,
+        next_todo_id: model.next_todo_id + 1,
         current_todo_content: ""
       });
     }
-  } else if (msg instanceof RemoveTodo) {
-    let todo_id = msg[0];
+  } else if (msg instanceof UserRemovedTodo) {
+    let id2 = msg.id;
     return model.withFields({
       todos: (() => {
         let _pipe = model.todos;
         return filter(_pipe, (todo_) => {
-          return todo_.id !== todo_id;
+          return todo_.id !== id2;
         });
       })()
     });
-  } else if (msg instanceof ToggleDone) {
-    let todo_id = msg[0];
+  } else if (msg instanceof UserToggledTodo) {
+    let id2 = msg.id;
     return model.withFields({
       todos: (() => {
         let _pipe = model.todos;
         return map(
           _pipe,
           (todo_) => {
-            let $ = todo_.id === todo_id;
+            let $ = todo_.id === id2;
             if ($) {
               return todo_.withFields({ done: !todo_.done });
             } else {
@@ -2548,8 +2548,8 @@ function update(model, msg) {
       })()
     });
   } else {
-    let str = msg[0];
-    return model.withFields({ current_todo_content: str });
+    let new_content = msg.new_content;
+    return model.withFields({ current_todo_content: new_content });
   }
 }
 function view(model) {
@@ -2565,9 +2565,11 @@ function view(model) {
               toList([
                 type_("checkbox"),
                 checked(todo_.done),
-                on_check((_) => {
-                  return new ToggleDone(todo_.id);
-                })
+                on_check(
+                  (_) => {
+                    return new UserToggledTodo(todo_.id);
+                  }
+                )
               ])
             ),
             p(toList([]), toList([text2(to_string2(todo_.id))])),
@@ -2608,7 +2610,7 @@ function view(model) {
               action("add-todo"),
               method("post"),
               class$("add-todo"),
-              on_submit(new AddTodo())
+              on_submit(new UserAddedTodo())
             ]),
             toList([
               input(
@@ -2619,7 +2621,7 @@ function view(model) {
                   placeholder("Task name"),
                   on_input(
                     (str) => {
-                      return new CurrentTodoUpdate(str);
+                      return new UserUpdatedCurrentTodoContent(str);
                     }
                   ),
                   value(model.current_todo_content)
@@ -2659,7 +2661,7 @@ function main2() {
     throw makeError(
       "assignment_no_match",
       "todo_lustre",
-      12,
+      11,
       "main",
       "Assignment pattern did not match",
       { value: $ }

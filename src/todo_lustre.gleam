@@ -1,5 +1,4 @@
 import gleam/int
-import gleam/io
 import gleam/list
 import lustre
 import lustre/attribute
@@ -35,7 +34,7 @@ pub type Model {
   Model(
     todos: List(Todo),
     current_todo_content: String,
-    next_id: Int,
+    next_todo_id: Int,
     local_user: User,
   )
 }
@@ -45,21 +44,21 @@ fn init(_flags) -> Model {
 }
 
 pub type Msg {
-  AddTodo
-  RemoveTodo(TodoId)
-  ToggleDone(TodoId)
-  CurrentTodoUpdate(String)
+  UserAddedTodo
+  UserRemovedTodo(id: TodoId)
+  UserToggledTodo(id: TodoId)
+  UserUpdatedCurrentTodoContent(new_content: String)
 }
 
 pub fn update(model: Model, msg: Msg) -> Model {
   case msg {
-    AddTodo -> {
+    UserAddedTodo -> {
       case model.current_todo_content == "" {
         True -> model
         False -> {
           let todo_ =
             Todo(
-              id: model.next_id,
+              id: model.next_todo_id,
               done: False,
               creator: model.local_user,
               content: model.current_todo_content,
@@ -67,29 +66,30 @@ pub fn update(model: Model, msg: Msg) -> Model {
           Model(
             ..model,
             todos: model.todos |> list.append([todo_]),
-            next_id: model.next_id + 1,
+            next_todo_id: model.next_todo_id + 1,
             current_todo_content: "",
           )
         }
       }
     }
-    RemoveTodo(todo_id) ->
+    UserRemovedTodo(id) ->
       Model(
         ..model,
-        todos: model.todos |> list.filter(fn(todo_) { todo_.id != todo_id }),
+        todos: model.todos |> list.filter(fn(todo_) { todo_.id != id }),
       )
-    ToggleDone(todo_id) ->
+    UserToggledTodo(id) ->
       Model(
         ..model,
         todos: model.todos
           |> list.map(fn(todo_) {
-            case todo_.id == todo_id {
+            case todo_.id == id {
               True -> Todo(..todo_, done: !todo_.done)
               False -> todo_
             }
           }),
       )
-    CurrentTodoUpdate(str) -> Model(..model, current_todo_content: str)
+    UserUpdatedCurrentTodoContent(new_content) ->
+      Model(..model, current_todo_content: new_content)
   }
 }
 
@@ -101,7 +101,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
         html.input([
           attribute.type_("checkbox"),
           attribute.checked(todo_.done),
-          event.on_check(fn(_) { ToggleDone(todo_.id) }),
+          event.on_check(fn(_) { UserToggledTodo(todo_.id) }),
         ]),
         html.p([], [html.text(int.to_string(todo_.id))]),
         html.p([], [html.text(todo_.content)]),
@@ -123,7 +123,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
           attribute.action("add-todo"),
           attribute.method("post"),
           attribute.class("add-todo"),
-          event.on_submit(AddTodo),
+          event.on_submit(UserAddedTodo),
         ],
         [
           html.input([
@@ -131,7 +131,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
             attribute.name("task-name"),
             attribute.id("task-name"),
             attribute.placeholder("Task name"),
-            event.on_input(fn(str) { CurrentTodoUpdate(str) }),
+            event.on_input(fn(str) { UserUpdatedCurrentTodoContent(str) }),
             attribute.value(model.current_todo_content),
           ]),
           html.input([attribute.type_("submit"), attribute.value("Add todo!")]),
