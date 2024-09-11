@@ -169,28 +169,28 @@ var Error = class extends Result {
 function isEqual(x, y) {
   let values = [x, y];
   while (values.length) {
-    let a2 = values.pop();
+    let a = values.pop();
     let b = values.pop();
-    if (a2 === b)
+    if (a === b)
       continue;
-    if (!isObject(a2) || !isObject(b))
+    if (!isObject(a) || !isObject(b))
       return false;
-    let unequal = !structurallyCompatibleObjects(a2, b) || unequalDates(a2, b) || unequalBuffers(a2, b) || unequalArrays(a2, b) || unequalMaps(a2, b) || unequalSets(a2, b) || unequalRegExps(a2, b);
+    let unequal = !structurallyCompatibleObjects(a, b) || unequalDates(a, b) || unequalBuffers(a, b) || unequalArrays(a, b) || unequalMaps(a, b) || unequalSets(a, b) || unequalRegExps(a, b);
     if (unequal)
       return false;
-    const proto = Object.getPrototypeOf(a2);
+    const proto = Object.getPrototypeOf(a);
     if (proto !== null && typeof proto.equals === "function") {
       try {
-        if (a2.equals(b))
+        if (a.equals(b))
           continue;
         else
           return false;
       } catch {
       }
     }
-    let [keys2, get2] = getters(a2);
-    for (let k of keys2(a2)) {
-      values.push(get2(a2, k), get2(b, k));
+    let [keys2, get2] = getters(a);
+    for (let k of keys2(a)) {
+      values.push(get2(a, k), get2(b, k));
     }
   }
   return true;
@@ -203,34 +203,34 @@ function getters(object3) {
     return [(x) => [...extra, ...Object.keys(x)], (x, y) => x[y]];
   }
 }
-function unequalDates(a2, b) {
-  return a2 instanceof Date && (a2 > b || a2 < b);
+function unequalDates(a, b) {
+  return a instanceof Date && (a > b || a < b);
 }
-function unequalBuffers(a2, b) {
-  return a2.buffer instanceof ArrayBuffer && a2.BYTES_PER_ELEMENT && !(a2.byteLength === b.byteLength && a2.every((n, i) => n === b[i]));
+function unequalBuffers(a, b) {
+  return a.buffer instanceof ArrayBuffer && a.BYTES_PER_ELEMENT && !(a.byteLength === b.byteLength && a.every((n, i) => n === b[i]));
 }
-function unequalArrays(a2, b) {
-  return Array.isArray(a2) && a2.length !== b.length;
+function unequalArrays(a, b) {
+  return Array.isArray(a) && a.length !== b.length;
 }
-function unequalMaps(a2, b) {
-  return a2 instanceof Map && a2.size !== b.size;
+function unequalMaps(a, b) {
+  return a instanceof Map && a.size !== b.size;
 }
-function unequalSets(a2, b) {
-  return a2 instanceof Set && (a2.size != b.size || [...a2].some((e) => !b.has(e)));
+function unequalSets(a, b) {
+  return a instanceof Set && (a.size != b.size || [...a].some((e) => !b.has(e)));
 }
-function unequalRegExps(a2, b) {
-  return a2 instanceof RegExp && (a2.source !== b.source || a2.flags !== b.flags);
+function unequalRegExps(a, b) {
+  return a instanceof RegExp && (a.source !== b.source || a.flags !== b.flags);
 }
-function isObject(a2) {
-  return typeof a2 === "object" && a2 !== null;
+function isObject(a) {
+  return typeof a === "object" && a !== null;
 }
-function structurallyCompatibleObjects(a2, b) {
-  if (typeof a2 !== "object" && typeof b !== "object" && (!a2 || !b))
+function structurallyCompatibleObjects(a, b) {
+  if (typeof a !== "object" && typeof b !== "object" && (!a || !b))
     return false;
   let nonstructural = [Promise, WeakSet, WeakMap, Function];
-  if (nonstructural.some((c) => a2 instanceof c))
+  if (nonstructural.some((c) => a instanceof c))
     return false;
-  return a2.constructor === b.constructor;
+  return a.constructor === b.constructor;
 }
 function makeError(variant, module, line, fn, message, extra) {
   let error = new globalThis.Error(message);
@@ -254,8 +254,8 @@ var None = class extends CustomType {
 };
 function to_result(option, e) {
   if (option instanceof Some) {
-    let a2 = option[0];
-    return new Ok(a2);
+    let a = option[0];
+    return new Ok(a);
   } else {
     return new Error(e);
   }
@@ -650,8 +650,8 @@ function hashByReference(o) {
   referenceMap.set(o, hash);
   return hash;
 }
-function hashMerge(a2, b) {
-  return a2 ^ b + 2654435769 + (a2 << 6) + (a2 >> 2) | 0;
+function hashMerge(a, b) {
+  return a ^ b + 2654435769 + (a << 6) + (a >> 2) | 0;
 }
 function hashString(s) {
   let hash = 0;
@@ -1635,9 +1635,6 @@ function placeholder(text3) {
 function name(name2) {
   return attribute("name", name2);
 }
-function href(uri) {
-  return attribute("href", uri);
-}
 function action(url) {
   return attribute("action", url);
 }
@@ -1681,6 +1678,9 @@ function element(tag, attrs, children2) {
 }
 function text(content) {
   return new Text(content);
+}
+function none2() {
+  return new Text("");
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/set.mjs
@@ -1841,7 +1841,7 @@ function createElementNode({ prev, next, dispatch, stack }) {
     handlersForEl = registeredHandlers.get(el2);
   }
   const prevHandlers = canMorph ? new Set(handlersForEl.keys()) : null;
-  const prevAttributes = canMorph ? new Set(Array.from(prev.attributes, (a2) => a2.name)) : null;
+  const prevAttributes = canMorph ? new Set(Array.from(prev.attributes, (a) => a.name)) : null;
   let className = null;
   let style = null;
   let innerHTML = null;
@@ -2402,8 +2402,8 @@ function p(attrs, children2) {
 function ul(attrs, children2) {
   return element("ul", attrs, children2);
 }
-function a(attrs, children2) {
-  return element("a", attrs, children2);
+function button(attrs, children2) {
+  return element("button", attrs, children2);
 }
 function form(attrs, children2) {
   return element("form", attrs, children2);
@@ -2415,6 +2415,11 @@ function input(attrs) {
 // build/dev/javascript/lustre/lustre/event.mjs
 function on2(name2, handler) {
   return on(name2, handler);
+}
+function on_click(msg) {
+  return on2("click", (_) => {
+    return new Ok(msg);
+  });
 }
 function value2(event2) {
   let _pipe = event2;
@@ -2466,13 +2471,30 @@ var Todo = class extends CustomType {
     this.content = content;
   }
 };
+var None2 = class extends CustomType {
+};
+var Login = class extends CustomType {
+  constructor(username, password) {
+    super();
+    this.username = username;
+    this.password = password;
+  }
+};
+var SignUp = class extends CustomType {
+  constructor(username, password) {
+    super();
+    this.username = username;
+    this.password = password;
+  }
+};
 var Model2 = class extends CustomType {
-  constructor(todos, current_todo_content, next_todo_id, local_user) {
+  constructor(todos, current_todo_content, next_todo_id, local_user, popup_state) {
     super();
     this.todos = todos;
     this.current_todo_content = current_todo_content;
     this.next_todo_id = next_todo_id;
     this.local_user = local_user;
+    this.popup_state = popup_state;
   }
 };
 var UserAddedTodo = class extends CustomType {
@@ -2495,8 +2517,26 @@ var UserUpdatedCurrentTodoContent = class extends CustomType {
     this.new_content = new_content;
   }
 };
+var UserUpdatedPopUpState = class extends CustomType {
+  constructor(new_state) {
+    super();
+    this.new_state = new_state;
+  }
+};
+var UserUpdatedPopUpUsername = class extends CustomType {
+  constructor(new_username) {
+    super();
+    this.new_username = new_username;
+  }
+};
+var UserUpdatedPopUpPassword = class extends CustomType {
+  constructor(new_password) {
+    super();
+    this.new_password = new_password;
+  }
+};
 function init2(_) {
-  return new Model2(toList([]), "", 1, "anonymous");
+  return new Model2(toList([]), "", 1, new None(), new None2());
 }
 function update(model, msg) {
   if (msg instanceof UserAddedTodo) {
@@ -2547,9 +2587,47 @@ function update(model, msg) {
         );
       })()
     });
-  } else {
+  } else if (msg instanceof UserUpdatedCurrentTodoContent) {
     let new_content = msg.new_content;
     return model.withFields({ current_todo_content: new_content });
+  } else if (msg instanceof UserUpdatedPopUpState) {
+    let new_state = msg.new_state;
+    let $ = model.popup_state;
+    if ($ instanceof Login && new_state instanceof None2) {
+      let username = $.username;
+      let password = $.password;
+      return model.withFields({ popup_state: new_state });
+    } else if ($ instanceof SignUp && new_state instanceof None2) {
+      let username = $.username;
+      let password = $.password;
+      return model.withFields({ popup_state: new_state });
+    } else {
+      return model.withFields({ popup_state: new_state });
+    }
+  } else if (msg instanceof UserUpdatedPopUpUsername) {
+    let new_username = msg.new_username;
+    let $ = model.popup_state;
+    if ($ instanceof None2) {
+      return model;
+    } else if ($ instanceof Login) {
+      let password = $.password;
+      return model.withFields({ popup_state: new Login(new_username, password) });
+    } else {
+      let password = $.password;
+      return model.withFields({ popup_state: new Login(new_username, password) });
+    }
+  } else {
+    let new_password = msg.new_password;
+    let $ = model.popup_state;
+    if ($ instanceof None2) {
+      return model;
+    } else if ($ instanceof Login) {
+      let username = $.username;
+      return model.withFields({ popup_state: new Login(username, new_password) });
+    } else {
+      let username = $.username;
+      return model.withFields({ popup_state: new Login(username, new_password) });
+    }
   }
 }
 function view(model) {
@@ -2574,12 +2652,64 @@ function view(model) {
             ),
             p(toList([]), toList([text2(to_string2(todo_.id))])),
             p(toList([]), toList([text2(todo_.content)])),
-            p(toList([]), toList([text2(todo_.creator)]))
+            p(
+              toList([]),
+              toList([
+                text2(
+                  (() => {
+                    let $ = todo_.creator;
+                    if ($ instanceof Some) {
+                      let creator = $[0];
+                      return creator;
+                    } else {
+                      return "Anonymous";
+                    }
+                  })()
+                )
+              ])
+            )
           ])
         );
       }
     );
   })();
+  let login_signup_form = (submit_button_value, username, password) => {
+    return form(
+      toList([on_submit(new UserUpdatedPopUpState(new None2()))]),
+      toList([
+        input(
+          toList([
+            type_("text"),
+            placeholder("Username"),
+            value(username),
+            on_input(
+              (new_username) => {
+                return new UserUpdatedPopUpUsername(new_username);
+              }
+            )
+          ])
+        ),
+        input(
+          toList([
+            type_("text"),
+            placeholder("Password"),
+            value(password),
+            on_input(
+              (new_password) => {
+                return new UserUpdatedPopUpPassword(new_password);
+              }
+            )
+          ])
+        ),
+        input(
+          toList([
+            type_("submit"),
+            value(submit_button_value)
+          ])
+        )
+      ])
+    );
+  };
   return div(
     toList([]),
     toList([
@@ -2588,22 +2718,52 @@ function view(model) {
         toList([
           nav(
             toList([]),
-            toList([
-              a(
-                toList([href("#")]),
-                toList([text2("Sign In")])
-              ),
-              a(
-                toList([href("#")]),
-                toList([text2("Sign up")])
-              )
-            ])
+            (() => {
+              let $ = model.local_user;
+              if ($ instanceof None) {
+                return toList([
+                  button(
+                    toList([
+                      on_click(
+                        new UserUpdatedPopUpState(new Login("", ""))
+                      )
+                    ]),
+                    toList([text2("Login")])
+                  ),
+                  button(
+                    toList([
+                      on_click(
+                        new UserUpdatedPopUpState(new SignUp("", ""))
+                      )
+                    ]),
+                    toList([text2("Sign Up")])
+                  )
+                ]);
+              } else {
+                let user = $[0];
+                return toList([text2(user)]);
+              }
+            })()
           )
         ])
       ),
       main(
         toList([]),
         toList([
+          (() => {
+            let $ = model.popup_state;
+            if ($ instanceof None2) {
+              return none2();
+            } else if ($ instanceof Login) {
+              let username = $.username;
+              let password = $.password;
+              return login_signup_form("Login", username, password);
+            } else {
+              let username = $.username;
+              let password = $.password;
+              return login_signup_form("Sign Up", username, password);
+            }
+          })(),
           h1(toList([]), toList([text2("Todo")])),
           form(
             toList([
@@ -2661,7 +2821,7 @@ function main2() {
     throw makeError(
       "assignment_no_match",
       "todo_lustre",
-      11,
+      12,
       "main",
       "Assignment pattern did not match",
       { value: $ }
