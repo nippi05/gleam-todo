@@ -76,7 +76,18 @@ pub type Msg {
   ApiRetunedLoginAttempt(Result(shared.LoginAttemptResponse, http.HttpError))
 }
 
-fn send_login(username: String, password: String) -> effect.Effect(Msg) {
+fn send_login_or_signup(
+  to_send_type: shared.LoginOrSignUp,
+  username: String,
+  password: String,
+) -> effect.Effect(Msg) {
+  let url =
+    server_url
+    <> "/"
+    <> case to_send_type {
+      shared.Login -> "login"
+      shared.SignUp -> "signup"
+    }
   let expect =
     http.expect_json(
       shared.decode_login_attempt_response,
@@ -89,7 +100,7 @@ fn send_login(username: String, password: String) -> effect.Effect(Msg) {
       #("password", json.string(password)),
     ])
 
-  http.post(server_url, body, expect)
+  http.post(url, body, expect)
 }
 
 pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
@@ -152,14 +163,13 @@ pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
         Some(Login(username, password)), None -> {
           #(
             Model(..model, login_popup: Some(Loading)),
-            send_login(username, password),
+            send_login_or_signup(shared.Login, username, password),
           )
         }
         Some(SignUp(username, password)), None -> {
           #(
             Model(..model, login_popup: Some(Loading)),
-            send_login(username, password),
-            // TODO: Change this to send signup
+            send_login_or_signup(shared.SignUp, username, password),
           )
         }
         _, _ -> #(

@@ -3646,6 +3646,10 @@ function expect_json(decoder, to_msg) {
 }
 
 // build/dev/javascript/shared/shared.mjs
+var Login = class extends CustomType {
+};
+var SignUp = class extends CustomType {
+};
 var User = class extends CustomType {
   constructor(id2, name2) {
     super();
@@ -3728,14 +3732,14 @@ var Todo = class extends CustomType {
     this.content = content;
   }
 };
-var Login = class extends CustomType {
+var Login2 = class extends CustomType {
   constructor(username, password) {
     super();
     this.username = username;
     this.password = password;
   }
 };
-var SignUp = class extends CustomType {
+var SignUp2 = class extends CustomType {
   constructor(username, password) {
     super();
     this.username = username;
@@ -3906,7 +3910,7 @@ function view(model) {
                     toList([
                       on_click(
                         new UserRequestedNewLoginPopUp(
-                          new Some(new Login("", ""))
+                          new Some(new Login2("", ""))
                         )
                       )
                     ]),
@@ -3916,7 +3920,7 @@ function view(model) {
                     toList([
                       on_click(
                         new UserRequestedNewLoginPopUp(
-                          new Some(new SignUp("", ""))
+                          new Some(new SignUp2("", ""))
                         )
                       )
                     ]),
@@ -3940,11 +3944,11 @@ function view(model) {
               return none2();
             } else {
               let popup = $[0];
-              if (popup instanceof Login) {
+              if (popup instanceof Login2) {
                 let username = popup.username;
                 let password = popup.password;
                 return login_signup_form("Login", username, password);
-              } else if (popup instanceof SignUp) {
+              } else if (popup instanceof SignUp2) {
                 let username = popup.username;
                 let password = popup.password;
                 return login_signup_form("Sign Up", username, password);
@@ -4015,7 +4019,14 @@ function view(model) {
   );
 }
 var server_url = "http://localhost:8000";
-function send_login(username, password) {
+function send_login_or_signup(to_send_type, username, password) {
+  let url = server_url + "/" + (() => {
+    if (to_send_type instanceof Login) {
+      return "login";
+    } else {
+      return "signup";
+    }
+  })();
   let expect = expect_json(
     decode_login_attempt_response,
     (var0) => {
@@ -4028,7 +4039,7 @@ function send_login(username, password) {
       ["password", string2(password)]
     ])
   );
-  return post(server_url, body, expect);
+  return post(url, body, expect);
 }
 function update(model, msg) {
   if (msg instanceof UserAddedTodo) {
@@ -4104,19 +4115,19 @@ function update(model, msg) {
         model.withFields({ login_popup: requested_state }),
         none()
       ];
-    } else if ($ instanceof Some && $[0] instanceof Login && requested_state instanceof None) {
+    } else if ($ instanceof Some && $[0] instanceof Login2 && requested_state instanceof None) {
       let username = $[0].username;
       let password = $[0].password;
       return [
         model.withFields({ login_popup: new Some(new Loading()) }),
-        send_login(username, password)
+        send_login_or_signup(new Login(), username, password)
       ];
-    } else if ($ instanceof Some && $[0] instanceof SignUp && requested_state instanceof None) {
+    } else if ($ instanceof Some && $[0] instanceof SignUp2 && requested_state instanceof None) {
       let username = $[0].username;
       let password = $[0].password;
       return [
         model.withFields({ login_popup: new Some(new Loading()) }),
-        send_login(username, password)
+        send_login_or_signup(new SignUp(), username, password)
       ];
     } else {
       return [
@@ -4161,19 +4172,19 @@ function update(model, msg) {
           let a = $;
           user_update_popup_input_error_function(to_update, new$4);
           return model;
-        } else if ($ instanceof Some && $[0] instanceof Login) {
+        } else if ($ instanceof Some && $[0] instanceof Login2) {
           let username = $[0].username;
           let password = $[0].password;
           let new_pair = get_new_pair(username, password, to_update, new$4);
           return model.withFields({
-            login_popup: new Some(new Login(new_pair[0], new_pair[1]))
+            login_popup: new Some(new Login2(new_pair[0], new_pair[1]))
           });
-        } else if ($ instanceof Some && $[0] instanceof SignUp) {
+        } else if ($ instanceof Some && $[0] instanceof SignUp2) {
           let username = $[0].username;
           let password = $[0].password;
           let new_pair = get_new_pair(username, password, to_update, new$4);
           return model.withFields({
-            login_popup: new Some(new SignUp(new_pair[0], new_pair[1]))
+            login_popup: new Some(new SignUp2(new_pair[0], new_pair[1]))
           });
         } else {
           return model;
