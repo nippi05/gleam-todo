@@ -32,6 +32,7 @@ pub type Todo {
 pub type LoginPopUp {
   Login(username: String, password: String)
   SignUp(username: String, password: String)
+  Failed(error: shared.LoginAttemptResponseFailure)
   Loading
 }
 
@@ -223,15 +224,19 @@ pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
             Ok(success), Some(Loading) ->
               Model(
                 ..model,
+                login_popup: None,
                 local_user: Some(success.user),
                 auth_token: Some(success.auth_token),
               )
-            // TODO: Change this
             Ok(_), _ -> {
-              io.debug("Got LoginAttemptResponse when not loading")
+              io.print_error("Got LoginAttemptResponse when not loading")
               model
             }
+            Error(error), Some(Loading) ->
+              Model(..model, login_popup: Some(Failed(error)))
+
             Error(error), _ -> {
+              io.print_error("HTTP response error (in debug after this)")
               io.debug(error)
               model
             }
@@ -333,6 +338,11 @@ pub fn view(model: Model) -> element.Element(Msg) {
               login_signup_form("Sign Up", username, password)
             // NOTE: Differentiate between different loading states?
             Loading -> html.text("WAITING FOR SERVER RESPONSE!")
+            Failed(error) ->
+              html.text(case error {
+                shared.IncorrectPassword -> "That's not the correct password"
+                shared.UserNotFound -> "That user name doesn't exist"
+              })
           }
       },
       html.h1([], [html.text("Todo")]),

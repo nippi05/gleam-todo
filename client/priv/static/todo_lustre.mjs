@@ -3742,6 +3742,12 @@ var SignUp = class extends CustomType {
     this.password = password;
   }
 };
+var Failed = class extends CustomType {
+  constructor(error) {
+    super();
+    this.error = error;
+  }
+};
 var Loading = class extends CustomType {
 };
 var Model2 = class extends CustomType {
@@ -3942,8 +3948,19 @@ function view(model) {
                 let username = popup.username;
                 let password = popup.password;
                 return login_signup_form("Sign Up", username, password);
-              } else {
+              } else if (popup instanceof Loading) {
                 return text2("WAITING FOR SERVER RESPONSE!");
+              } else {
+                let error = popup.error;
+                return text2(
+                  (() => {
+                    if (error instanceof IncorrectPassword) {
+                      return "That's not the correct password";
+                    } else {
+                      return "That user name doesn't exist";
+                    }
+                  })()
+                );
               }
             }
           })(),
@@ -4174,14 +4191,19 @@ function update(model, msg) {
           if (attempt.isOk() && $ instanceof Some && $[0] instanceof Loading) {
             let success = attempt[0];
             return model.withFields({
+              login_popup: new None(),
               local_user: new Some(success.user),
               auth_token: new Some(success.auth_token)
             });
           } else if (attempt.isOk()) {
-            debug("Got LoginAttemptResponse when not loading");
+            print_error2("Got LoginAttemptResponse when not loading");
             return model;
+          } else if (!attempt.isOk() && $ instanceof Some && $[0] instanceof Loading) {
+            let error = attempt[0];
+            return model.withFields({ login_popup: new Some(new Failed(error)) });
           } else {
             let error = attempt[0];
+            print_error2("HTTP response error (in debug after this)");
             debug(error);
             return model;
           }
