@@ -12,7 +12,6 @@ import lustre/event
 import lustre_http as http
 import shared.{type User}
 
-// TODO: Make this https? and a real server
 const server_url = "http://localhost:8000"
 
 pub fn main() {
@@ -316,10 +315,11 @@ pub fn view(model: Model) -> element.Element(Msg) {
         None -> [
           html.button(
             [
-              event.on_click(UserRequestedNewLoginPopUp(
-                // TODO: This shouldn't really be wrapped in a optional
-                Some(Login(username: "", password: "")),
-              )),
+              event.on_click(
+                UserRequestedNewLoginPopUp(
+                  Some(Login(username: "", password: "")),
+                ),
+              ),
             ],
             [html.text("Login")],
           ),

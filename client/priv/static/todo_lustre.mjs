@@ -4236,7 +4236,7 @@ function main2() {
     throw makeError(
       "assignment_no_match",
       "todo_lustre",
-      20,
+      19,
       "main",
       "Assignment pattern did not match",
       { value: $ }
