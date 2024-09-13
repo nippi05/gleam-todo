@@ -1,14 +1,22 @@
 import gleam/int
+import gleam/io
+import gleam/json
 import gleam/list
-import gleam/option
+import gleam/option.{type Option, None, Some}
 import lustre
 import lustre/attribute
+import lustre/effect
 import lustre/element
 import lustre/element/html
 import lustre/event
+import lustre_http as http
+import shared.{type User}
+
+// TODO: Make this https? and a real server
+const server_url = "http://localhost:8000"
 
 pub fn main() {
-  let app = lustre.simple(init, update, view)
+  let app = lustre.application(init, update, view)
   let assert Ok(_) = lustre.start(app, "#app", Nil)
 
   Nil
@@ -17,32 +25,39 @@ pub fn main() {
 pub type TodoId =
   Int
 
-// TODO: Change this
-pub type User =
-  String
-
 pub type Todo {
-  Todo(id: TodoId, done: Bool, creator: option.Option(User), content: String)
+  Todo(id: TodoId, done: Bool, creator: Option(User), content: String)
 }
 
-pub type PopUpState {
-  None
+pub type LoginPopUp {
   Login(username: String, password: String)
   SignUp(username: String, password: String)
+  Loading(from: LoginPopUp)
 }
 
 pub type Model {
   Model(
     todos: List(Todo),
-    current_todo_content: String,
+    current_todo_input_content: String,
     next_todo_id: Int,
-    local_user: option.Option(User),
-    popup_state: PopUpState,
+    local_user: Option(User),
+    auth_token: Option(String),
+    login_popup: Option(LoginPopUp),
   )
 }
 
-fn init(_flags) -> Model {
-  Model([], "", 1, option.None, None)
+fn init(_flags) -> #(Model, effect.Effect(Msg)) {
+  #(
+    Model(
+      todos: [],
+      current_todo_input_content: "",
+      next_todo_id: 1,
+      local_user: None,
+      auth_token: None,
+      login_popup: None,
+    ),
+    effect.none(),
+  )
 }
 
 pub type Msg {
@@ -50,39 +65,61 @@ pub type Msg {
   UserRemovedTodo(id: TodoId)
   UserToggledTodo(id: TodoId)
   UserUpdatedCurrentTodoContent(new_content: String)
-  UserUpdatedPopUpState(new_state: PopUpState)
+  UserRequestedNewLoginPopUp(requested_state: Option(LoginPopUp))
   UserUpdatedPopUpUsername(new_username: String)
   UserUpdatedPopUpPassword(new_password: String)
+  ApiRetunedLoginAttempt(Result(shared.LoginAttemptResponse, http.HttpError))
 }
 
-pub fn update(model: Model, msg: Msg) -> Model {
+fn send_login(username: String, password: String) -> effect.Effect(Msg) {
+  let expect =
+    http.expect_json(
+      shared.decode_login_attempt_response,
+      ApiRetunedLoginAttempt,
+    )
+
+  let body =
+    json.object([
+      #("username", json.string(username)),
+      #("password", json.string(password)),
+    ])
+
+  http.post(server_url, body, expect)
+}
+
+pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
   case msg {
     UserAddedTodo -> {
-      case model.current_todo_content == "" {
-        True -> model
-        False -> {
-          let todo_ =
-            Todo(
-              id: model.next_todo_id,
-              done: False,
-              creator: model.local_user,
-              content: model.current_todo_content,
+      #(
+        case model.current_todo_input_content == "" {
+          True -> model
+          False -> {
+            let todo_ =
+              Todo(
+                id: model.next_todo_id,
+                done: False,
+                creator: model.local_user,
+                content: model.current_todo_input_content,
+              )
+            Model(
+              ..model,
+              todos: model.todos |> list.append([todo_]),
+              next_todo_id: model.next_todo_id + 1,
+              current_todo_input_content: "",
             )
-          Model(
-            ..model,
-            todos: model.todos |> list.append([todo_]),
-            next_todo_id: model.next_todo_id + 1,
-            current_todo_content: "",
-          )
-        }
-      }
+          }
+        },
+        effect.none(),
+      )
     }
-    UserRemovedTodo(id) ->
+    UserRemovedTodo(id) -> #(
       Model(
         ..model,
         todos: model.todos |> list.filter(fn(todo_) { todo_.id != id }),
-      )
-    UserToggledTodo(id) ->
+      ),
+      effect.none(),
+    )
+    UserToggledTodo(id) -> #(
       Model(
         ..model,
         todos: model.todos
@@ -92,48 +129,115 @@ pub fn update(model: Model, msg: Msg) -> Model {
               False -> todo_
             }
           }),
-      )
-    UserUpdatedCurrentTodoContent(new_content) ->
-      Model(..model, current_todo_content: new_content)
+      ),
+      effect.none(),
+    )
+    UserUpdatedCurrentTodoContent(new_content) -> #(
+      Model(..model, current_todo_input_content: new_content),
+      effect.none(),
+    )
 
-    UserUpdatedPopUpState(new_state) ->
-      case model.popup_state, new_state {
-        // TODO: Send network request here to verify login or signup
-        Login(username, password), None ->
-          Model(..model, popup_state: new_state)
-        SignUp(username, password), None ->
-          Model(..model, popup_state: new_state)
-        _, _ -> Model(..model, popup_state: new_state)
-      }
-    UserUpdatedPopUpUsername(new_username) ->
-      case model.popup_state {
-        None -> model
-        Login(_, password) ->
-          Model(
-            ..model,
-            popup_state: Login(username: new_username, password: password),
-          )
-        SignUp(_, password) ->
-          Model(
-            ..model,
-            popup_state: Login(username: new_username, password: password),
-          )
-      }
+    UserRequestedNewLoginPopUp(requested_state) ->
+      case model.login_popup, requested_state {
+        None, Some(_) -> #(
+          Model(..model, login_popup: requested_state),
+          effect.none(),
+        )
 
-    UserUpdatedPopUpPassword(new_password) ->
-      case model.popup_state {
-        None -> model
-        Login(username, _) ->
-          Model(
-            ..model,
-            popup_state: Login(username: username, password: new_password),
+        Some(Login(username, password)), None -> {
+          #(
+            Model(
+              ..model,
+              login_popup: Some(Loading(Login(username, password))),
+            ),
+            send_login(username, password),
           )
-        SignUp(username, _) ->
-          Model(
-            ..model,
-            popup_state: Login(username: username, password: new_password),
+        }
+        Some(SignUp(username, password)), None -> {
+          #(
+            Model(
+              ..model,
+              login_popup: Some(Loading(SignUp(username, password))),
+            ),
+            send_login(username, password),
+            // TODO: Change this to send signup
           )
+        }
+        _, _ -> #(
+          Model(..io.debug(model), login_popup: io.debug(requested_state)),
+          effect.none(),
+        )
       }
+    UserUpdatedPopUpUsername(new_username) -> #(
+      case model.login_popup {
+        None -> model
+        Some(Loading(_)) -> model
+        Some(Login(_, password)) ->
+          Model(
+            ..model,
+            login_popup: Some(Login(username: new_username, password: password)),
+          )
+        Some(SignUp(_, password)) ->
+          Model(
+            ..model,
+            login_popup: Some(Login(username: new_username, password: password)),
+          )
+      },
+      effect.none(),
+    )
+
+    UserUpdatedPopUpPassword(new_password) -> #(
+      case model.login_popup {
+        None -> model
+        Some(Loading(_)) -> model
+        Some(Login(username, _)) ->
+          Model(
+            ..model,
+            login_popup: Some(Login(username: username, password: new_password)),
+          )
+        Some(SignUp(username, _)) ->
+          Model(
+            ..model,
+            login_popup: Some(Login(username: username, password: new_password)),
+          )
+      },
+      effect.none(),
+    )
+
+    ApiRetunedLoginAttempt(response) -> #(
+      case response {
+        Ok(attempt) ->
+          case attempt, model.login_popup {
+            Ok(success), Some(Loading(Login(_, _))) ->
+              Model(
+                ..model,
+                local_user: Some(success.user),
+                auth_token: Some(success.auth_token),
+              )
+            Ok(success), Some(Loading(SignUp(_, _))) ->
+              Model(
+                ..model,
+                local_user: Some(success.user),
+                auth_token: Some(success.auth_token),
+              )
+            // TODO: Change this
+            Ok(_), _ -> {
+              io.debug("Got LoginAttemptResponse when not loading")
+              model
+            }
+            Error(error), _ -> {
+              io.debug(error)
+              model
+            }
+          }
+        Error(error) -> {
+          io.print_error("Http error response from LoginAttemptResponse: ")
+          io.debug(error)
+          model
+        }
+      },
+      effect.none(),
+    )
   }
 }
 
@@ -151,15 +255,17 @@ pub fn view(model: Model) -> element.Element(Msg) {
         html.p([], [html.text(todo_.content)]),
         html.p([], [
           html.text(case todo_.creator {
-            option.Some(creator) -> creator
-            option.None -> "Anonymous"
+            // NOTE: This is sort of for debugging
+            Some(creator) ->
+              creator.name <> " (" <> int.to_string(creator.id) <> ")"
+            None -> "Anonymous"
           }),
         ]),
       ])
     })
 
   let login_signup_form = fn(submit_button_value, username, password) {
-    html.form([event.on_submit(UserUpdatedPopUpState(None))], [
+    html.form([event.on_submit(UserRequestedNewLoginPopUp(None))], [
       html.input([
         attribute.type_("text"),
         attribute.placeholder("Username"),
@@ -186,34 +292,42 @@ pub fn view(model: Model) -> element.Element(Msg) {
   html.div([], [
     html.header([], [
       html.nav([], case model.local_user {
-        option.None -> [
+        None -> [
           html.button(
             [
-              event.on_click(
-                UserUpdatedPopUpState(Login(username: "", password: "")),
-              ),
+              event.on_click(UserRequestedNewLoginPopUp(
+                // TODO: This shouldn't really be wrapped in a optional
+                Some(Login(username: "", password: "")),
+              )),
             ],
             [html.text("Login")],
           ),
           html.button(
             [
               event.on_click(
-                UserUpdatedPopUpState(SignUp(username: "", password: "")),
+                UserRequestedNewLoginPopUp(
+                  Some(SignUp(username: "", password: "")),
+                ),
               ),
             ],
             [html.text("Sign Up")],
           ),
         ]
-        option.Some(user) -> [html.text(user)]
+        Some(user) -> [html.text(user.name)]
       }),
     ]),
     html.main([], [
-      case model.popup_state {
+      case model.login_popup {
         None -> element.none()
-        Login(username, password) ->
-          login_signup_form("Login", username, password)
-        SignUp(username, password) ->
-          login_signup_form("Sign Up", username, password)
+        Some(popup) ->
+          case popup {
+            Login(username, password) ->
+              login_signup_form("Login", username, password)
+            SignUp(username, password) ->
+              login_signup_form("Sign Up", username, password)
+            // NOTE: Differentiate between different loading states?
+            Loading(_) -> html.text("WAITING FOR SERVER RESPONSE!")
+          }
       },
       html.h1([], [html.text("Todo")]),
       html.form(
@@ -230,7 +344,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
             attribute.id("task-name"),
             attribute.placeholder("Task name"),
             event.on_input(fn(str) { UserUpdatedCurrentTodoContent(str) }),
-            attribute.value(model.current_todo_content),
+            attribute.value(model.current_todo_input_content),
           ]),
           html.input([attribute.type_("submit"), attribute.value("Add todo!")]),
         ],
