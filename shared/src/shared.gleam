@@ -3,6 +3,11 @@ import gleam/json
 import gleam/option
 import gleam/result
 
+pub type LoginOrSignUp {
+  Login
+  SignUp
+}
+
 pub type User {
   User(id: Int, name: String)
 }

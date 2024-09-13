@@ -3755,6 +3755,10 @@ var Model2 = class extends CustomType {
     this.login_popup = login_popup;
   }
 };
+var Username = class extends CustomType {
+};
+var Password = class extends CustomType {
+};
 var UserAddedTodo = class extends CustomType {
 };
 var UserRemovedTodo = class extends CustomType {
@@ -3781,16 +3785,11 @@ var UserRequestedNewLoginPopUp = class extends CustomType {
     this.requested_state = requested_state;
   }
 };
-var UserUpdatedPopUpUsername = class extends CustomType {
-  constructor(new_username) {
+var UserUpdatedPopUpInput = class extends CustomType {
+  constructor(to_update, new$4) {
     super();
-    this.new_username = new_username;
-  }
-};
-var UserUpdatedPopUpPassword = class extends CustomType {
-  constructor(new_password) {
-    super();
-    this.new_password = new_password;
+    this.to_update = to_update;
+    this.new = new$4;
   }
 };
 var ApiRetunedLoginAttempt = class extends CustomType {
@@ -3859,7 +3858,7 @@ function view(model) {
             value(username),
             on_input(
               (new_username) => {
-                return new UserUpdatedPopUpUsername(new_username);
+                return new UserUpdatedPopUpInput(new Username(), new_username);
               }
             )
           ])
@@ -3871,7 +3870,7 @@ function view(model) {
             value(password),
             on_input(
               (new_password) => {
-                return new UserUpdatedPopUpPassword(new_password);
+                return new UserUpdatedPopUpInput(new Password(), new_password);
               }
             )
           ])
@@ -4108,48 +4107,59 @@ function update(model, msg) {
         none()
       ];
     }
-  } else if (msg instanceof UserUpdatedPopUpUsername) {
-    let new_username = msg.new_username;
+  } else if (msg instanceof UserUpdatedPopUpInput) {
+    let to_update = msg.to_update;
+    let new$4 = msg.new;
+    let user_update_popup_input_error_function = (this_to_update, new$5) => {
+      return print_error2(
+        "UserUpdatedPopUpInput called when model.login_popup is " + (() => {
+          let $ = model.login_popup;
+          if ($ instanceof Some && $[0] instanceof Loading) {
+            return "Some(Loading)";
+          } else if ($ instanceof None) {
+            return "None";
+          } else {
+            return "something i didn't expect to happen (CODE ULTRA RED) ";
+          }
+        })() + "to update: " + (() => {
+          if (this_to_update instanceof Username) {
+            return "Username";
+          } else {
+            return "Password";
+          }
+        })() + ' with new input: "' + new$5 + '"'
+      );
+    };
+    let get_new_pair = (old_username, old_password, this_to_update, new$5) => {
+      if (this_to_update instanceof Password) {
+        return [old_username, new$5];
+      } else {
+        return [new$5, old_password];
+      }
+    };
     return [
       (() => {
         let $ = model.login_popup;
-        if ($ instanceof None) {
-          return model;
-        } else if ($ instanceof Some && $[0] instanceof Loading) {
-          return model;
-        } else if ($ instanceof Some && $[0] instanceof Login) {
-          let password = $[0].password;
-          return model.withFields({
-            login_popup: new Some(new Login(new_username, password))
-          });
-        } else {
-          let password = $[0].password;
-          return model.withFields({
-            login_popup: new Some(new Login(new_username, password))
-          });
-        }
-      })(),
-      none()
-    ];
-  } else if (msg instanceof UserUpdatedPopUpPassword) {
-    let new_password = msg.new_password;
-    return [
-      (() => {
-        let $ = model.login_popup;
-        if ($ instanceof None) {
-          return model;
-        } else if ($ instanceof Some && $[0] instanceof Loading) {
+        if (isEqual($, new None()) || isEqual($, new Some(new Loading()))) {
+          let a = $;
+          user_update_popup_input_error_function(to_update, new$4);
           return model;
         } else if ($ instanceof Some && $[0] instanceof Login) {
           let username = $[0].username;
+          let password = $[0].password;
+          let new_pair = get_new_pair(username, password, to_update, new$4);
           return model.withFields({
-            login_popup: new Some(new Login(username, new_password))
+            login_popup: new Some(new Login(new_pair[0], new_pair[1]))
+          });
+        } else if ($ instanceof Some && $[0] instanceof SignUp) {
+          let username = $[0].username;
+          let password = $[0].password;
+          let new_pair = get_new_pair(username, password, to_update, new$4);
+          return model.withFields({
+            login_popup: new Some(new SignUp(new_pair[0], new_pair[1]))
           });
         } else {
-          let username = $[0].username;
-          return model.withFields({
-            login_popup: new Some(new Login(username, new_password))
-          });
+          return model;
         }
       })(),
       none()

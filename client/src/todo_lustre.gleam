@@ -60,14 +60,18 @@ fn init(_flags) -> #(Model, effect.Effect(Msg)) {
   )
 }
 
+pub type UsernameOrPassword {
+  Username
+  Password
+}
+
 pub type Msg {
   UserAddedTodo
   UserRemovedTodo(id: TodoId)
   UserToggledTodo(id: TodoId)
   UserUpdatedCurrentTodoContent(new_content: String)
   UserRequestedNewLoginPopUp(requested_state: Option(LoginPopUp))
-  UserUpdatedPopUpUsername(new_username: String)
-  UserUpdatedPopUpPassword(new_password: String)
+  UserUpdatedPopUpInput(to_update: UsernameOrPassword, new: String)
   ApiRetunedLoginAttempt(Result(shared.LoginAttemptResponse, http.HttpError))
 }
 
@@ -162,41 +166,55 @@ pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
           effect.none(),
         )
       }
-    UserUpdatedPopUpUsername(new_username) -> #(
-      case model.login_popup {
-        None -> model
-        Some(Loading) -> model
-        Some(Login(_, password)) ->
-          Model(
-            ..model,
-            login_popup: Some(Login(username: new_username, password: password)),
-          )
-        Some(SignUp(_, password)) ->
-          Model(
-            ..model,
-            login_popup: Some(Login(username: new_username, password: password)),
-          )
-      },
-      effect.none(),
-    )
 
-    UserUpdatedPopUpPassword(new_password) -> #(
-      case model.login_popup {
-        None -> model
-        Some(Loading) -> model
-        Some(Login(username, _)) ->
-          Model(
-            ..model,
-            login_popup: Some(Login(username: username, password: new_password)),
-          )
-        Some(SignUp(username, _)) ->
-          Model(
-            ..model,
-            login_popup: Some(Login(username: username, password: new_password)),
-          )
-      },
-      effect.none(),
-    )
+    UserUpdatedPopUpInput(to_update, new) -> {
+      let user_update_popup_input_error_function = fn(this_to_update, new) {
+        // THIS IS AN IMPOSSIBLE ERROR
+        io.print_error(
+          "UserUpdatedPopUpInput called when model.login_popup is "
+          <> case model.login_popup {
+            Some(Loading) -> "Some(Loading)"
+            None -> "None"
+            _ -> "something i didn't expect to happen (CODE ULTRA RED) "
+          }
+          <> "to update: "
+          <> case this_to_update {
+            Username -> "Username"
+            Password -> "Password"
+          }
+          <> " with new input: \""
+          <> new
+          <> "\"",
+        )
+      }
+      let get_new_pair = fn(old_username, old_password, this_to_update, new) {
+        case this_to_update {
+          Password -> #(old_username, new)
+          Username -> #(new, old_password)
+        }
+      }
+      #(
+        case model.login_popup {
+          // Some sort of error reporting on these _impossible_ events...
+          a if a == None || a == Some(Loading) -> {
+            user_update_popup_input_error_function(to_update, new)
+            model
+          }
+          Some(Login(username, password)) -> {
+            let new_pair = get_new_pair(username, password, to_update, new)
+            Model(..model, login_popup: Some(Login(new_pair.0, new_pair.1)))
+          }
+
+          Some(SignUp(username, password)) -> {
+            let new_pair = get_new_pair(username, password, to_update, new)
+            Model(..model, login_popup: Some(SignUp(new_pair.0, new_pair.1)))
+          }
+
+          _ -> model
+        },
+        effect.none(),
+      )
+    }
 
     ApiRetunedLoginAttempt(response) -> #(
       case response {
@@ -259,7 +277,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
         attribute.placeholder("Username"),
         attribute.value(username),
         event.on_input(fn(new_username) {
-          UserUpdatedPopUpUsername(new_username)
+          UserUpdatedPopUpInput(Username, new_username)
         }),
       ]),
       html.input([
@@ -267,7 +285,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
         attribute.placeholder("Password"),
         attribute.value(password),
         event.on_input(fn(new_password) {
-          UserUpdatedPopUpPassword(new_password)
+          UserUpdatedPopUpInput(Password, new_password)
         }),
       ]),
       html.input([
