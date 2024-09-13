@@ -3743,10 +3743,6 @@ var SignUp = class extends CustomType {
   }
 };
 var Loading = class extends CustomType {
-  constructor(from2) {
-    super();
-    this.from = from2;
-  }
 };
 var Model2 = class extends CustomType {
   constructor(todos, current_todo_input_content, next_todo_id, local_user, auth_token, login_popup) {
@@ -4096,18 +4092,14 @@ function update(model, msg) {
       let username = $[0].username;
       let password = $[0].password;
       return [
-        model.withFields({
-          login_popup: new Some(new Loading(new Login(username, password)))
-        }),
+        model.withFields({ login_popup: new Some(new Loading()) }),
         send_login(username, password)
       ];
     } else if ($ instanceof Some && $[0] instanceof SignUp && requested_state instanceof None) {
       let username = $[0].username;
       let password = $[0].password;
       return [
-        model.withFields({
-          login_popup: new Some(new Loading(new SignUp(username, password)))
-        }),
+        model.withFields({ login_popup: new Some(new Loading()) }),
         send_login(username, password)
       ];
     } else {
@@ -4169,13 +4161,7 @@ function update(model, msg) {
         if (response.isOk()) {
           let attempt = response[0];
           let $ = model.login_popup;
-          if (attempt.isOk() && $ instanceof Some && $[0] instanceof Loading && $[0].from instanceof Login) {
-            let success = attempt[0];
-            return model.withFields({
-              local_user: new Some(success.user),
-              auth_token: new Some(success.auth_token)
-            });
-          } else if (attempt.isOk() && $ instanceof Some && $[0] instanceof Loading && $[0].from instanceof SignUp) {
+          if (attempt.isOk() && $ instanceof Some && $[0] instanceof Loading) {
             let success = attempt[0];
             return model.withFields({
               local_user: new Some(success.user),

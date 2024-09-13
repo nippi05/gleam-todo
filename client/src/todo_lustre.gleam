@@ -32,7 +32,7 @@ pub type Todo {
 pub type LoginPopUp {
   Login(username: String, password: String)
   SignUp(username: String, password: String)
-  Loading(from: LoginPopUp)
+  Loading
 }
 
 pub type Model {
@@ -146,19 +146,13 @@ pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
 
         Some(Login(username, password)), None -> {
           #(
-            Model(
-              ..model,
-              login_popup: Some(Loading(Login(username, password))),
-            ),
+            Model(..model, login_popup: Some(Loading)),
             send_login(username, password),
           )
         }
         Some(SignUp(username, password)), None -> {
           #(
-            Model(
-              ..model,
-              login_popup: Some(Loading(SignUp(username, password))),
-            ),
+            Model(..model, login_popup: Some(Loading)),
             send_login(username, password),
             // TODO: Change this to send signup
           )
@@ -171,7 +165,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
     UserUpdatedPopUpUsername(new_username) -> #(
       case model.login_popup {
         None -> model
-        Some(Loading(_)) -> model
+        Some(Loading) -> model
         Some(Login(_, password)) ->
           Model(
             ..model,
@@ -189,7 +183,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
     UserUpdatedPopUpPassword(new_password) -> #(
       case model.login_popup {
         None -> model
-        Some(Loading(_)) -> model
+        Some(Loading) -> model
         Some(Login(username, _)) ->
           Model(
             ..model,
@@ -208,13 +202,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       case response {
         Ok(attempt) ->
           case attempt, model.login_popup {
-            Ok(success), Some(Loading(Login(_, _))) ->
-              Model(
-                ..model,
-                local_user: Some(success.user),
-                auth_token: Some(success.auth_token),
-              )
-            Ok(success), Some(Loading(SignUp(_, _))) ->
+            Ok(success), Some(Loading) ->
               Model(
                 ..model,
                 local_user: Some(success.user),
@@ -326,7 +314,7 @@ pub fn view(model: Model) -> element.Element(Msg) {
             SignUp(username, password) ->
               login_signup_form("Sign Up", username, password)
             // NOTE: Differentiate between different loading states?
-            Loading(_) -> html.text("WAITING FOR SERVER RESPONSE!")
+            Loading -> html.text("WAITING FOR SERVER RESPONSE!")
           }
       },
       html.h1([], [html.text("Todo")]),
